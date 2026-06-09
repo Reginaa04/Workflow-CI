@@ -23,7 +23,7 @@ jobs:
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn
 
       # =========================================================================
-      # FIX MUTLAK: MENGGUNAKAN 'MLProject' (P BESAR) SESUAI STRUKTUR GITHUB KAMU
+      # MENGEKSEKUSI MLFLOW TEPAT PADA FOLDER PROYEK (P BESAR)
       # =========================================================================
       - name: Run MLflow Project
         working-directory: ./Workflow-CI/MLProject

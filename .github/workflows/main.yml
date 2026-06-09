@@ -22,27 +22,33 @@ jobs:
         run: |
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn requests waitress
 
-      # Langkah 1: Jalankan training (Menghasilkan artefak model di mlruns/0/)
+      # Langkah 1: Jalankan training (Menghasilkan folder mlruns/0/<RUN_ID>)
       - name: Run Training Python
         working-directory: ./Workflow-CI/MLProject
         run: |
           python modelling.py
 
-      # Langkah 2: MENJALANKAN MLFLOW MODELS SERVE SEPERTI REKOMENDASI REVIEWER
+      # Langkah 2: OTOMATIS DETEKSI RUN_ID DAN NYALAKAN SERVE DENGAN BENAR
       - name: Start MLflow Model Serving
         working-directory: ./Workflow-CI/MLProject
         run: |
-          mlflow models serve -m "mlruns/0/" --port 5002 --no-conda &
-          echo "Menunggu server MLflow Serve up dan siap menerima request..."
+          # Cari folder Run ID terbaru di dalam mlruns/0/ (abaikan berkas meta.yaml)
+          RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
+          echo "Menemukan RUN_ID Terkini: $RUN_ID"
+          
+          # Jalankan server langsung menunjuk ke lokasi artifact model yang valid
+          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/model" --host 0.0.0.0 --port 5002 --no-conda &
+          
+          echo "Menunggu server MLflow Serve benar-benar aktif..."
           sleep 15
 
-      # Langkah 3: Eksekusi API hit menggunakan data riil via inference.py yang baru
+      # Langkah 3: Jalankan Inference Testing (Hit Endpoint dengan data riil)
       - name: Run Inference (Hit Endpoint)
         working-directory: ./Workflow-CI/MLProject
         run: |
           python inference.py
 
-      # Langkah 4: Build Docker Image sesuai kriteria kelulusan
+      # Langkah 4: Build Docker Image
       - name: Build Docker Image
         run: |
           echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile

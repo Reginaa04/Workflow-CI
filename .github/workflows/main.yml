@@ -28,7 +28,7 @@ jobs:
         run: |
           python modelling.py
 
-     # Langkah 2 & 3: JALANKAN SERVING & HIT SECARA OTOMATIS (PERBAIKAN PATH MODEL)
+      # Langkah 2 & 3: JALANKAN SERVING & HIT SECARA OTOMATIS (MENCETAK LOG WAITRESS ASLI)
       - name: Start MLflow Serving and Hit Endpoint
         working-directory: ./Workflow-CI/MLProject
         run: |
@@ -54,7 +54,13 @@ jobs:
           echo "--> Membersihkan proses background..."
           pkill -f "mlflow models serve" || true
 
+      # Langkah 4: Build Docker Image (INI YANG TADI HILANG!)
+      - name: Build Docker Image
+        run: |
+          echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
+          docker build -t reginaa04/model-sml:latest .
 
+      # Langkah 5: Push ke Docker Hub
       - name: Push Docker Image to Docker Hub
         run: |
           echo "Push Sukses ke Docker Hub reginaa04!"

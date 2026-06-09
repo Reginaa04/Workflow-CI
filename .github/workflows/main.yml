@@ -22,19 +22,35 @@ jobs:
         run: |
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn requests waitress
 
-      # Langkah 1: Jalankan training (Menghasilkan folder mlruns kriteria 2)
+      # Langkah 1: Jalankan training (Kriteria 2)
       - name: Run Training Python
         working-directory: ./Workflow-CI/MLProject
         run: |
           python modelling.py
 
-      # Langkah 2: Jalankan Inference (Mencetak log Waitress asli + Prediksi Data Riil)
-      - name: Run Inference Model Serving
+      # Langkah 2 & 3: JALANKAN SERVING & HIT SECARA OTOMATIS (MENCETAK LOG WAITRESS ASLI)
+      - name: Start MLflow Serving and Hit Endpoint
         working-directory: ./Workflow-CI/MLProject
         run: |
+          # 1. Cari RUN_ID hasil training secara otomatis
+          RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
+          echo "Menemukan RUN_ID Terkini: $RUN_ID"
+          
+          # 2. Nyalakan server resmi MLflow secara langsung di background
+          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/model" --host 127.0.0.1 --port 5002 --no-conda &
+          
+          # 3. Beri jeda 15 detik agar LOG ASLI WAITRESS tercetak utuh di layar terminal GitHub Actions
+          echo "Menunggu server Waitress memuat model..."
+          sleep 15
+          
+          # 4. Jalankan script inference untuk menembak data riil saat server aktif
           python inference.py
+          
+          # 5. MATIKAN SERVER SECARA PAKSA AGAR WORKFLOW GAK MACET/LAMA!
+          echo "--> Membersihkan proses background..."
+          pkill -f "mlflow models serve" || true
 
-      # Langkah 3: Build Docker Image sebagai syarat kelulusan tingkat lanjut
+      # Langkah 4: Build Docker Image (Kriteria Akhir)
       - name: Build Docker Image
         run: |
           echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile

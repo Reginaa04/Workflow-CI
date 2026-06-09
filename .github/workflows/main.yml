@@ -22,18 +22,19 @@ jobs:
         run: |
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn
 
-      # =========================================================================
-      # BYPASS UTAMA: KITA LANGSUNG EKSEKUSI PYTHON AGAR MLFLOW TIDAK REWEL
-      # MENCARI FILE CONDA YANG REWEL ITU! AUTOLOG TETAP BERJALAN SEMPURNA!
-      # =========================================================================
-      - name: Run MLflow Project
+      # Langkah 1: Jalankan training (Ini menghasilkan artefak model di folder mlruns)
+      - name: Run Training Python
         working-directory: ./Workflow-CI/MLProject
         run: |
           python modelling.py
 
-      # =========================================================================
-      # PROSES DOCKER IMAGE UNTUK SYARAT KELULUSAN
-      # =========================================================================
+      # Langkah 2: Jalankan Inference (Load model asli hasil langkah 1 + prediksi data asli)
+      - name: Run Inference Model Serving
+        working-directory: ./Workflow-CI/MLProject
+        run: |
+          python inference.py
+
+      # Langkah 3: Build Docker Image sebagai syarat kelulusan akhir
       - name: Build Docker Image
         run: |
           echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib\nCOPY . /app\nWORKDIR /app" > Dockerfile

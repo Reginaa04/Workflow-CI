@@ -23,11 +23,12 @@ jobs:
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn
 
       # =========================================================================
-      # PERINTAH STANDAR STABIL SESUAI REKOMENDASI UTAMA REVIEWER
+      # FIX MUTLAK: MENGGUNAKAN 'MLProject' (P BESAR) SESUAI STRUKTUR GITHUB KAMU
       # =========================================================================
       - name: Run MLflow Project
+        working-directory: ./Workflow-CI/MLProject
         run: |
-          mlflow run ./Workflow-CI/MLproject --env-manager=local
+          mlflow run . --env-manager=local
 
       # =========================================================================
       # PROSES DOCKER IMAGE UNTUK SYARAT KELULUSAN

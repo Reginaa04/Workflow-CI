@@ -34,7 +34,7 @@ jobs:
         run: |
           python inference.py &
           echo "Menunggu Server API Serving bangun..."
-          sleep 5
+          sleep 10
 
       # Langkah 3: API HIT DENGAN DATA RIIL MENGGUNAKAN CURL (BUKTI EVIDENCE VALID!)
       - name: Execute API Hit with Real Data

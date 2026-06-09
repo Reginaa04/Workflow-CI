@@ -4,7 +4,7 @@ import requests
 import json
 
 def run_inference():
-    # 1. Ambil data tes asli hasil preprocessing (BIAR REVIEWER GA PROTES DATA DUMMY!)
+    # 1. Ambil data tes asli hasil preprocessing (DATA RIIL MEDIS DIABETES!)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     X_test_path = os.path.join(current_dir, 'namadataset_preprocessing', 'test_preprocessed.csv')
     
@@ -16,12 +16,15 @@ def run_inference():
     # Ambil 5 baris sampel data riil/nyata
     sample_data = df_test.head(5)
     
-    # 2. Ubah format data sesuai standar input MLflow Serving API
+    # =========================================================================
+    # FORMAT PALING REKOMENDASI UNTUK MLFLOW SERVING: DATAFRAME_SPLIT
+    # BIAR SERVER MLFLOW LANGSUNG PAHAM STRUKTUR KOLOM DATA ASLI KAMU
+    # =========================================================================
     payload = {
-        "dataframe_records": sample_data.to_dict(orient='records')
+        "dataframe_split": sample_data.to_dict(orient='split')
     }
     
-    # 3. Tembak ke endpoint lokal yang dinyalakan oleh GitHub Actions
+    # 3. Tembak ke endpoint lokal resmi MLflow (/invocations) di port 5002
     url = "http://127.0.0.1:5002/invocations"
     headers = {"Content-Type": "application/json"}
     
@@ -31,7 +34,7 @@ def run_inference():
     # 4. Cetak hasil response dari server
     if response.status_code == 200:
         print("✅ BERHASIL SERVING! Hasil Prediksi Model:")
-        print(response.json())
+        print(json.dumps(response.json(), indent=2))
     else:
         print(f"❌ GAGAL SERVING! Status Code: {response.status_code}")
         print(response.text)

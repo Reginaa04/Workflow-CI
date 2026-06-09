@@ -28,19 +28,19 @@ jobs:
         run: |
           python modelling.py
 
-      # Langkah 2: Jalankan Inference & Cetak Bukti Serving (Kriteria 4)
+      # Langkah 2: Jalankan Inference & Serving yang sudah terbukti HIJAU tadi!
       - name: Run Inference Model Serving
         working-directory: ./Workflow-CI/MLProject
         run: |
           python inference.py
 
-      # Langkah 3: Build Docker Image
+      # Langkah 3: Build Docker Image (Kriteria 5)
       - name: Build Docker Image
         run: |
           echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
           docker build -t reginaa04/model-sml:latest .
 
-      # Langkah 4: Push Sukses Simulasi
+      # Langkah 4: Push Simulasi Sukses ke Docker Hub
       - name: Push Docker Image to Docker Hub
         run: |
           echo "Push Sukses ke Docker Hub reginaa04!"

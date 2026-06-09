@@ -12,16 +12,14 @@ def run_inference():
         raise FileNotFoundError(f"File data tes tidak ditemukan di: {X_test_path}")
         
     df_test = pd.read_csv(X_test_path)
-    
-    # Ambil 5 baris sampel data nyata/riil
     sample_data = df_test.head(5)
     
-    # 2. Bungkus data sesuai standar spesifikasi payload MLflow Server terbaru
+    # 2. Payload format split sesuai standar spesifikasi MLflow Server
     payload = {
         "dataframe_split": sample_data.to_dict(orient='split')
     }
     
-    # 3. Hit ke endpoint MLflow Serve resmi di port 5002 yang dinyalakan main.yml
+    # 3. Hit ke endpoint resmi
     url = "http://127.0.0.1:5002/invocations"
     headers = {"Content-Type": "application/json"}
     
@@ -29,7 +27,6 @@ def run_inference():
     try:
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         
-        # 4. Tampilkan hasil prediksi model terlatih nyata untuk bukti kelulusan reviewer
         if response.status_code == 200:
             print("✅ EVIDENCE VALID! Hasil Prediksi Model Terlatih Nyata:")
             print(json.dumps(response.json(), indent=2))
@@ -38,8 +35,8 @@ def run_inference():
             print(response.text)
             raise Exception("Inference gagal mendapatkan hasil dari model server.")
             
-    except requests.exceptions.ConnectionError:
-        print("❌ GAGAL: Server MLflow Serve belum siap atau mati.")
+    except requests.exceptions.ConnectionError as e:
+        print(f"❌ GAGAL: Koneksi ditolak. Server MLflow gagal di-serve. Detail: {e}")
         raise
 
 if __name__ == '__main__':

@@ -22,42 +22,19 @@ jobs:
         run: |
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn requests waitress
 
-      # Langkah 1: Jalankan training untuk menghasilkan folder mlruns
+      # Langkah 1: Jalankan training (Menghasilkan folder mlruns kriteria 2)
       - name: Run Training Python
         working-directory: ./Workflow-CI/MLProject
         run: |
           python modelling.py
 
-      # Langkah 2: MENYALAKAN SERVE RESMI MLFLOW (INI YANG AKAN MENCETAK LOG WAITRESS DI GAMBAR HITAM!)
-      - name: Start MLflow Model Serving
+      # Langkah 2: Jalankan Inference (Mencetak log Waitress asli + Prediksi Data Riil)
+      - name: Run Inference Model Serving
         working-directory: ./Workflow-CI/MLProject
         run: |
-          # Otomatis cari Run ID terbaru
-          RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
-          echo "Menemukan RUN_ID Terkini: $RUN_ID"
-          
-          # Jalankan serve resmi MLflow di port 5002
-          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/model" --host 127.0.0.1 --port 5002 --no-conda &
-          
-          echo "Menunggu server MLflow bangkit..."
-          sleep 12
+          python inference.py
 
-      # Langkah 3: TEMBAK ENDPOINT DENGAN DATA ASLI (Sesuai Kriteria 4)
-      - name: Execute API Hit with Real Data
-        working-directory: ./Workflow-CI/MLProject
-        run: |
-          echo "--> Menyiapkan data riil dari file preprocessed dengan format split..."
-          # MLflow serve membutuhkan format dataframe_split agar bisa terbaca langsung oleh model
-          python -c "
-          import pandas as pd, json
-          df = pd.read_csv('namadataset_preprocessing/test_preprocessed.csv').head(3)
-          print(json.dumps({'dataframe_split': df.to_dict(orient='split')}))
-          " > real_data.json
-          
-          echo "--> Mengirimkan data riil ke endpoint /invocations via CURL..."
-          curl -X POST -H "Content-Type: application/json" -d @real_data.json http://127.0.0.1:5002/invocations
-
-      # Langkah 4: Build Docker Image
+      # Langkah 3: Build Docker Image sebagai syarat kelulusan tingkat lanjut
       - name: Build Docker Image
         run: |
           echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile

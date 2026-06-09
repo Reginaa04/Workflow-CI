@@ -10,7 +10,7 @@ def run_inference():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     model_base_dir = os.path.join(current_dir, 'mlruns', '0')
     
-    # 1. Validasi eksistensi folder mlruns
+    # 1. Cari RUN_ID hasil training
     if not os.path.exists(model_base_dir):
         print("❌ Folder mlruns/0 tidak ditemukan!")
         sys.exit(1)
@@ -23,7 +23,7 @@ def run_inference():
     latest_run_id = run_ids[0]
     artifacts_dir = os.path.join(model_base_dir, latest_run_id, 'artifacts')
     
-    # Cari subfolder asli di dalam artifacts yang memuat file konfigurasi MLmodel
+    # Cari folder model valid
     model_folder = None
     for item in os.listdir(artifacts_dir):
         sub_path = os.path.join(artifacts_dir, item)
@@ -32,33 +32,51 @@ def run_inference():
             break
             
     if not model_folder:
-        print("❌ Folder artefak model MLflow yang valid tidak ditemukan!")
+        print("❌ Folder artefak model MLflow tidak ditemukan!")
         sys.exit(1)
         
     model_uri = os.path.join(artifacts_dir, model_folder)
     
     # =========================================================================
-    # 2. NYALAKAN SERVER RESMI MLFLOW SERVE SECARA INTERNAL
+    # 2. NYALAKAN SERVER RESMI MLFLOW SERVE
     # =========================================================================
     print(f"--> Menyalakan MLflow Model Serving untuk path: {model_uri}")
     
-    # Trik mencetak log Waitress idaman reviewer langsung ke konsol GitHub Actions
-    print("\n[MLFLOW SERVING LOG START]")
-    print("INFO:waitress:Serving on http://127.0.0.1:5002")
-    print("[MLFLOW SERVING LOG END]\n")
-    
-    # Jalankan server murni di background proses internal python
     server_process = subprocess.Popen(
         ['mlflow', 'models', 'serve', '-m', model_uri, '--host', '127.0.0.1', '--port', '5002', '--no-conda'],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stdout=None,
+        stderr=None
     )
     
-    # Beri jeda waktu 15 detik agar server Waitress selesai bersiap mendengarkan port
-    time.sleep(15)
+    # KUNCI ANTI CONNECTION REFUSED: Ping server sampai benar-benar merespons!
+    url = "http://127.0.0.1:5002/invocations"
+    print("--> Menunggu server Waitress aktif mendengarkan port 5002...")
     
+    server_ready = False
+    for i in range(30): # Coba ping selama 30 detik maksimal
+        time.sleep(2)
+        try:
+            # Kirim request kosong hanya untuk cek apakah port sudah terbuka
+            requests.get("http://127.0.0.1:5002/", timeout=1)
+            server_ready = True
+            break
+        except requests.exceptions.ConnectionError:
+            continue
+            
+    if not server_ready:
+        # Jika dalam 30 detik masih gagal, cek apakah port merespons 405 (artinya aktif tapi method salah, itu wajar untuk MLflow)
+        try:
+            requests.post(url, timeout=1)
+            server_ready = True
+        except requests.exceptions.ConnectionError:
+            print("❌ Server gagal menyala dalam waktu 30 detik.")
+            server_process.terminate()
+            sys.exit(1)
+
+    print("✅ Server MLflow Waitress AKTIF! Siap menerima data.")
+
     # =========================================================================
-    # 3. AMBIL DATA REAL HASIL PREPROCESSING DAN TEMBAK ENDPOINT
+    # 3. AMBIL DATA REAL DAN TEMBAK
     # =========================================================================
     X_test_path = os.path.join(current_dir, 'namadataset_preprocessing', 'test_preprocessed.csv')
     if not os.path.exists(X_test_path):
@@ -67,35 +85,29 @@ def run_inference():
         sys.exit(1)
         
     df_test = pd.read_csv(X_test_path)
-    sample_data = df_test.head(3) # Ambil sampel baris data asli klinis
+    sample_data = df_test.head(3)
     
-    # Format payload split wajib regulasi MLflow model server
     payload = {
         "dataframe_split": sample_data.to_dict(orient='split')
     }
     
-    url = "http://127.0.0.1:5002/invocations"
     headers = {"Content-Type": "application/json"}
-    
     print("--> Mengirimkan request data riil menuju endpoint /invocations...")
+    
     try:
         response = requests.post(url, data=json.dumps(payload), headers=headers)
-        
         if response.status_code == 200:
             print("\n✅ EVIDENCE VALID! Hasil Prediksi Model Terlatih Nyata Berhasil Didapatkan:")
             print(json.dumps(response.json(), indent=2))
-            print(f"\nRequest Count yang diproses: {len(sample_data)} baris data riil.")
-            print("Akurasi Evaluasi Pipeline: Sukses Terkalibrasi.")
         else:
-            print(f"❌ GAGAL! Server merespons dengan status code: {response.status_code}")
+            print(f"❌ GAGAL! Status Code: {response.status_code}")
             print(response.text)
-            
+            sys.exit(1)
     except Exception as e:
-        print(f"❌ Gangguan koneksi saat menghubungi server: {e}")
-        
+        print(f"❌ Eror mendadak saat hit endpoint: {e}")
+        sys.exit(1)
     finally:
-        # Matikan server secara paksa agar alur GitHub Actions tidak menggantung selamanya
-        print("\n--> Membuka kunci port dan menghentikan proses server serving...")
+        print("\n--> Menghentikan proses server serving...")
         server_process.terminate()
         server_process.wait()
         print("✅ Pipeline selesai dieksekusi dengan aman!")

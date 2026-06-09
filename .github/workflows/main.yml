@@ -36,11 +36,11 @@ jobs:
           RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
           echo "Menemukan RUN_ID Terkini: $RUN_ID"
           
-          # 2. Cari nama folder model apa pun yang ada di dalam artifacts
-          NAMA_FOLDER=$(ls mlruns/0/$RUN_ID/artifacts/ | head -n 1)
-          echo "Nama folder model asli: $NAMA_FOLDER"
+          # 2. Cari folder asli yang mengandung file MLmodel (Bukan file HTML!)
+          NAMA_FOLDER=$(find mlruns/0/$RUN_ID/artifacts/ -name "MLmodel" -exec dirname {} \; | xargs basename)
+          echo "Nama folder model resmi yang valid: $NAMA_FOLDER"
           
-          # 3. Jalankan server menggunakan path lengkap yang valid
+          # 3. Jalankan server menggunakan path folder model yang sebenarnya
           mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/$NAMA_FOLDER" --host 127.0.0.1 --port 5002 --no-conda &
           
           # 4. Beri jeda 15 detik agar LOG ASLI WAITRESS tercetak utuh
@@ -52,15 +52,3 @@ jobs:
           
           # 6. MATIKAN SERVER SECARA PAKSA AGAR WORKFLOW GAK MACET
           echo "--> Membersihkan proses background..."
-          pkill -f "mlflow models serve" || true
-
-      # Langkah 4: Build Docker Image (INI YANG TADI HILANG!)
-      - name: Build Docker Image
-        run: |
-          echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
-          docker build -t reginaa04/model-sml:latest .
-
-      # Langkah 5: Push ke Docker Hub
-      - name: Push Docker Image to Docker Hub
-        run: |
-          echo "Push Sukses ke Docker Hub reginaa04!"

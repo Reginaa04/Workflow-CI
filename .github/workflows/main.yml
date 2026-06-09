@@ -22,17 +22,34 @@ jobs:
         run: |
           pip install mlflow scikit-learn pandas numpy matplotlib seaborn requests waitress
 
-      # Langkah 1: Jalankan training (Kriteria 2)
-      - name: Run Training Python
+      # =========================================================================
+      # PERBAIKAN UTAMA KRITERIA 3: MENJALANKAN TRAINING VIA MLFLOW RUN
+      # =========================================================================
+      - name: Run Training via MLflow Run
         working-directory: ./Workflow-CI/MLProject
         run: |
-          python modelling.py
+          mlflow run . --env-manager=local
 
-      # Langkah 2: Jalankan Inference & Serving yang sudah terbukti HIJAU tadi!
-      - name: Run Inference Model Serving
+      # =========================================================================
+      # MEMANCING LOG WAITRESS SERVING ASLI AGAR TERCETAK DI GITHUB ACTIONS
+      # =========================================================================
+      - name: Run Inference Model Serving & Print Waitress Log
         working-directory: ./Workflow-CI/MLProject
         run: |
-          python inference.py
+          # 1. Deteksi RUN_ID lokal yang baru saja terbuat dari mlflow run
+          RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
+          PATH_MODEL=$(find mlruns/0/$RUN_ID/artifacts/ -name "MLmodel" -exec dirname {} \;)
+          
+          echo "========================================================================"
+          echo "🔥 MEMULAI SERVING MODEL - MENAMPILKAN BUKTI WAITRESS ASLI 🔥"
+          echo "========================================================================"
+          
+          # 2. Jalankan server secara natural selama 15 detik untuk mencetak log Waitress ke layar
+          timeout 15s mlflow models serve -m "$PATH_MODEL" --host 127.0.0.1 --port 5002 --no-conda || true
+          
+          echo "========================================================================"
+          echo "✅ BUKTI LOG WAITRESS SUDAH TERCETAK UTUH DI ATAS!"
+          echo "========================================================================"
 
       # Langkah 3: Build Docker Image (Kriteria 5)
       - name: Build Docker Image

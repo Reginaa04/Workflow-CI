@@ -28,7 +28,7 @@ jobs:
         run: |
           python modelling.py
 
-      # Langkah 2 & 3: JALANKAN SERVING & HIT SECARA OTOMATIS (MENCETAK LOG WAITRESS ASLI)
+     # Langkah 2 & 3: JALANKAN SERVING & HIT SECARA OTOMATIS (PERBAIKAN PATH MODEL)
       - name: Start MLflow Serving and Hit Endpoint
         working-directory: ./Workflow-CI/MLProject
         run: |
@@ -36,25 +36,24 @@ jobs:
           RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
           echo "Menemukan RUN_ID Terkini: $RUN_ID"
           
-          # 2. Nyalakan server resmi MLflow secara langsung di background
-          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/model" --host 127.0.0.1 --port 5002 --no-conda &
+          # 2. Cari nama folder model apa pun yang ada di dalam artifacts
+          NAMA_FOLDER=$(ls mlruns/0/$RUN_ID/artifacts/ | head -n 1)
+          echo "Nama folder model asli: $NAMA_FOLDER"
           
-          # 3. Beri jeda 15 detik agar LOG ASLI WAITRESS tercetak utuh di layar terminal GitHub Actions
+          # 3. Jalankan server menggunakan path lengkap yang valid
+          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/$NAMA_FOLDER" --host 127.0.0.1 --port 5002 --no-conda &
+          
+          # 4. Beri jeda 15 detik agar LOG ASLI WAITRESS tercetak utuh
           echo "Menunggu server Waitress memuat model..."
           sleep 15
           
-          # 4. Jalankan script inference untuk menembak data riil saat server aktif
+          # 5. Jalankan script inference untuk menembak data riil
           python inference.py
           
-          # 5. MATIKAN SERVER SECARA PAKSA AGAR WORKFLOW GAK MACET/LAMA!
+          # 6. MATIKAN SERVER SECARA PAKSA AGAR WORKFLOW GAK MACET
           echo "--> Membersihkan proses background..."
           pkill -f "mlflow models serve" || true
 
-      # Langkah 4: Build Docker Image (Kriteria Akhir)
-      - name: Build Docker Image
-        run: |
-          echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
-          docker build -t reginaa04/model-sml:latest .
 
       - name: Push Docker Image to Docker Hub
         run: |

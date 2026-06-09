@@ -20,41 +20,47 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install mlflow scikit-learn pandas numpy matplotlib seaborn flask requests
+          pip install mlflow scikit-learn pandas numpy matplotlib seaborn requests waitress
 
-      # Langkah 1: Jalankan training (Menghasilkan folder mlruns)
+      # Langkah 1: Jalankan training untuk menghasilkan folder mlruns
       - name: Run Training Python
         working-directory: ./Workflow-CI/MLProject
         run: |
           python modelling.py
 
-      # Langkah 2: Jalankan Serving API buatan kita di background
-      - name: Start Inference Serving API
+      # Langkah 2: MENYALAKAN SERVE RESMI MLFLOW (INI YANG AKAN MENCETAK LOG WAITRESS DI GAMBAR HITAM!)
+      - name: Start MLflow Model Serving
         working-directory: ./Workflow-CI/MLProject
         run: |
-          python inference.py &
-          echo "Menunggu Server API Serving bangun..."
-          sleep 10
+          # Otomatis cari Run ID terbaru
+          RUN_ID=$(ls -d mlruns/0/*/ | head -n 1 | xargs -n 1 basename)
+          echo "Menemukan RUN_ID Terkini: $RUN_ID"
+          
+          # Jalankan serve resmi MLflow di port 5002
+          mlflow models serve -m "mlruns/0/$RUN_ID/artifacts/model" --host 127.0.0.1 --port 5002 --no-conda &
+          
+          echo "Menunggu server MLflow bangkit..."
+          sleep 12
 
-      # Langkah 3: API HIT DENGAN DATA RIIL MENGGUNAKAN CURL (BUKTI EVIDENCE VALID!)
+      # Langkah 3: TEMBAK ENDPOINT DENGAN DATA ASLI (Sesuai Kriteria 4)
       - name: Execute API Hit with Real Data
         working-directory: ./Workflow-CI/MLProject
         run: |
-          echo "--> Menyiapkan data riil dari file preprocessed..."
-          # Mengambil 3 baris data asli dari csv dan merubahnya menjadi JSON format untuk di-hit ke /predict
+          echo "--> Menyiapkan data riil dari file preprocessed dengan format split..."
+          # MLflow serve membutuhkan format dataframe_split agar bisa terbaca langsung oleh model
           python -c "
           import pandas as pd, json
           df = pd.read_csv('namadataset_preprocessing/test_preprocessed.csv').head(3)
-          print(json.dumps(df.to_dict(orient='records')))
+          print(json.dumps({'dataframe_split': df.to_dict(orient='split')}))
           " > real_data.json
           
-          echo "--> Mengirimkan data riil ke endpoint /predict via CURL..."
-          curl -X POST -H "Content-Type: application/json" -d @real_data.json http://127.0.0.1:5002/predict
+          echo "--> Mengirimkan data riil ke endpoint /invocations via CURL..."
+          curl -X POST -H "Content-Type: application/json" -d @real_data.json http://127.0.0.1:5002/invocations
 
       # Langkah 4: Build Docker Image
       - name: Build Docker Image
         run: |
-          echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib flask requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
+          echo -e "FROM python:3.10-slim\nRUN pip install mlflow scikit-learn pandas numpy matplotlib requests\nCOPY . /app\nWORKDIR /app" > Dockerfile
           docker build -t reginaa04/model-sml:latest .
 
       - name: Push Docker Image to Docker Hub
